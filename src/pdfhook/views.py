@@ -1,6 +1,6 @@
 from flask import (
     request, render_template, jsonify, Response, url_for,
-    current_app, send_file, redirect)
+    current_app, send_file, redirect, abort)
 from sqlalchemy.engine.reflection import Inspector
 import io, os, glob, json, datetime
 from src.main import db
@@ -61,6 +61,7 @@ def post_pdf():
     if not request.files:
         abort(Response("No files found"))
     # what should it do if it receives no files?
+    # for json: abort(400) or @app.errorhandler(400) bad request
     file_storage = request.files['file']
     filename = os.path.basename(file_storage.filename)
     raw_pdf_data = file_storage.read()
@@ -76,7 +77,6 @@ def post_pdf():
     if request_wants_json():
         return jsonify(pdf_dumper.dump(pdf).data)
     return redirect(url_for('pdfhook.get_pdf', pdf_id=pdf.id))
-
 
 
 @blueprint.route('/<int:pdf_id>/', methods=['GET'])
@@ -120,3 +120,10 @@ def fill_pdf(pdf_id):
         attachment_filename=filename,
         mimetype='application/pdf')
 
+
+@blueprint.route('/<int:pdf_id>', methods=['DELETE'])
+@blueprint.route('/<int:pdf_id>/delete/', methods=['POST'])
+def delete_pdf(pdf_id):
+    pdf = models.PDFForm.query.filter_by(id=pdf_id).delete()
+    db.session.commit()
+    return redirect(url_for('pdfhook.index'))
